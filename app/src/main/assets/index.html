@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TokLite</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:#000;color:#fff;font-family:Arial,sans-serif;height:100%;overflow:hidden}
+header{position:fixed;top:0;left:0;right:0;height:58px;z-index:10;background:linear-gradient(#000b,transparent);display:flex;align-items:center;justify-content:space-between;padding:0 14px}
+.logo{font-size:23px;font-weight:900}.btn{border:0;border-radius:9px;padding:9px 13px;font-weight:700;background:#fe2c55;color:#fff}
+main{height:100dvh;max-width:720px;margin:auto}
+#auth{margin:80px 16px;background:#151519;border:1px solid #292930;border-radius:15px;padding:18px}
+input{width:100%;padding:12px;margin:7px 0;background:#0b0b0f;border:1px solid #34343d;border-radius:9px;color:#fff;font-size:16px}
+.tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(720px,100%);height:58px;z-index:20;background:#09090c;display:flex;gap:5px;padding:7px}
+.tab{flex:1;background:#19191f}
+.hidden{display:none!important}.msg{color:#25dfe0;min-height:20px}.muted{color:#aaa}
+#feed{height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain}
+.tokpost{height:100dvh;min-height:500px;position:relative;scroll-snap-align:start;background:#000;display:flex;align-items:center;justify-content:center}
+.tokpost video{width:100%;height:100%;object-fit:cover;background:#050505}
+.info{position:absolute;left:14px;right:70px;bottom:75px;text-shadow:0 2px 8px #000}
+.info b{font-size:18px}.info p{margin:8px 0}.views{color:#ddd;font-size:13px}
+.side{position:absolute;right:12px;bottom:90px;display:flex;flex-direction:column;gap:10px;align-items:center}
+.action{width:48px;height:48px;border-radius:50%;background:#222b;color:#fff;border:1px solid #555;font-size:19px}
+.action small{display:block;font-size:11px;margin-top:2px}.bot{font-size:11px;color:#25dfe0;text-align:center}
+#post,#profile{margin:70px 16px 80px}
+</style>
+</head>
+<body>
+<header><div class="logo">TokLite</div><button class="btn" id="headerBtn">Create account</button></header>
+<main>
+<section id="auth" class="card">
+<h2 id="authTitle">Create your account</h2>
+<input id="username" autocomplete="username" placeholder="Username" maxlength="20">
+<input id="password" autocomplete="new-password" type="password" placeholder="Password">
+<button class="btn" id="authBtn">Create account</button>
+<p class="msg" id="authMsg"></p>
+<button class="btn" style="background:none;color:#25dfe0;padding-left:0" id="switchBtn">Already have an account? Log in</button>
+</section>
+
+<section id="app" class="hidden">
+<div class="tabs">
+<button class="btn tab" data-page="feed">For You</button>
+<button class="btn tab" data-page="post">＋ Post</button>
+<button class="btn tab" data-page="profile">Profile</button>
+</div>
+<section id="feed"></section>
+<section id="post" class="hidden card">
+<h2>Post a video</h2>
+<p class="muted">Videos stay on this device in this demo.</p>
+<input id="caption" placeholder="Caption" maxlength="120">
+<input id="video" type="file" accept="video/*">
+<button class="btn" id="postBtn">Post video</button>
+<p class="msg" id="postMsg"></p>
+</section>
+<section id="profile" class="hidden card">
+<h2 id="profileName"></h2><p id="profilePosts"></p>
+<p class="muted">🤖 Demo viewers only: these are local test views, not real people.</p>
+<button class="btn" id="demoViews">Run 10 demo views</button>
+<button class="btn" id="logout">Log out</button>
+</section>
+</section>
+</main>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+let users={};let posts=[];let current="";
+try{users=JSON.parse(localStorage.getItem("toklite_users")||"{}")||{};posts=JSON.parse(localStorage.getItem("toklite_posts")||"[]")||[];current=localStorage.getItem("toklite_current")||""}catch(e){localStorage.clear()}
+
+function save(){
+ try{localStorage.setItem("toklite_users",JSON.stringify(users));localStorage.setItem("toklite_posts",JSON.stringify(posts));if(current)localStorage.setItem("toklite_current",current)}
+ catch(e){$("authMsg").textContent="Browser storage is unavailable. Try Chrome or Firefox."}
+}
+function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function show(){
+ $("auth").classList.toggle("hidden",!!current);$("app").classList.toggle("hidden",!current);
+ if(current){renderFeed();renderProfile()} 
+}
+function renderFeed(){
+ const f=$("feed");f.innerHTML="";
+ if(!posts.length){f.innerHTML='<div class="tokpost"><div class="info"><b>No videos yet 🎬</b><p>Tap ＋ Post to make the first one.</p></div></div>';return}
+ posts.slice().reverse().forEach(p=>{
+  const d=document.createElement("article");d.className="tokpost";
+  d.innerHTML='<video playsinline loop preload="metadata"></video><div class="info"><b>@'+esc(p.user)+'</b><p>'+esc(p.caption)+'</p><div class="views">👁 <span class="viewCount">'+(p.views||0)+'</span> views</div></div><div class="side"><button class="action likeBtn">♥<small>Like</small></button><button class="action botBtn">🤖<small>Demo bot</small></button></div>';
+  const v=d.querySelector("video");v.src=p.video;
+  d.querySelector(".likeBtn").onclick=()=>{p.likes=p.likes||[];const n=p.likes.indexOf(current);n<0?p.likes.push(current):p.likes.splice(n,1);save();d.querySelector(".likeBtn").textContent=(p.likes.includes(current)?"♥":"♡");};
+  d.querySelector(".botBtn").onclick=()=>{p.views=(p.views||0)+1;save();d.querySelector(".viewCount").textContent=p.views;};
+  f.appendChild(d);
+ });
+ setupAutoPlay();
+}
+function setupAutoPlay(){
+ const cards=[...document.querySelectorAll(".tokpost")];
+ const io=new IntersectionObserver(entries=>entries.forEach(e=>{
+   const v=e.target.querySelector("video");
+   if(e.isIntersecting){v.play().catch(()=>{});e.target.dataset.seen="1"}
+   else v.pause();
+ }),{threshold:.65});
+ cards.forEach(c=>io.observe(c));
+}
+function renderProfile(){$("profileName").textContent="@"+current;$("profilePosts").textContent=posts.filter(p=>p.user===current).length+" posts"}
+let login=false;
+$("authBtn").onclick=function(){
+ const u=$("username").value.trim().toLowerCase(),pw=$("password").value;
+ if(!/^[a-z0-9_]{3,20}$/.test(u)){ $("authMsg").textContent="Username: 3–20 letters, numbers, or _";return}
+ if(pw.length<4){$("authMsg").textContent="Password needs at least 4 characters.";return}
+ if(login){if(!Object.prototype.hasOwnProperty.call(users,u)||users[u]!==pw){$("authMsg").textContent="Wrong username or password.";return}}
+ else {if(Object.prototype.hasOwnProperty.call(users,u)){ $("authMsg").textContent="Username already exists.";return}users[u]=pw}
+ current=u;save();$("username").value="";$("password").value="";$("authMsg").textContent="";show();
+};
+$("switchBtn").onclick=function(){login=!login;$("authTitle").textContent=login?"Log in":"Create your account";$("authBtn").textContent=login?"Log in":"Create account";$("switchBtn").textContent=login?"Need an account? Create one":"Already have an account? Log in";$("authMsg").textContent=""};
+$("headerBtn").onclick=function(){current="";localStorage.removeItem("toklite_current");login=false;$("authTitle").textContent="Create your account";$("authBtn").textContent="Create account";show()};
+document.querySelectorAll(".tab").forEach(b=>b.onclick=function(){
+ document.querySelectorAll("#app>section:not(.tabs)").forEach(x=>x.classList.add("hidden"));
+ $(b.dataset.page).classList.remove("hidden");
+ if(b.dataset.page==="feed")renderFeed();
+});
+$("postBtn").onclick=function(){
+ const file=$("video").files[0];if(!file){$("postMsg").textContent="Choose a video first.";return}
+ if(file.size>12*1024*1024){$("postMsg").textContent="Demo limit is 12 MB.";return}
+ const r=new FileReader();r.onload=function(){posts.push({user:current,caption:$("caption").value,video:r.result,date:Date.now(),views:0,likes:[]});save();$("caption").value="";$("video").value="";$("postMsg").textContent="Posted!";renderFeed();renderProfile()};r.onerror=function(){$("postMsg").textContent="Could not read that video."};r.readAsDataURL(file)
+};
+$("demoViews").onclick=function(){
+ const mine=posts.filter(p=>p.user===current);
+ mine.forEach(p=>p.views=(p.views||0)+10);
+ save();renderFeed();renderProfile();
+};
+$("logout").onclick=function(){current="";localStorage.removeItem("toklite_current");show()};
+show();
+})();
+</script>
+</body>
+</html>
